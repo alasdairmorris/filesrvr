@@ -45,5 +45,25 @@ go install github.com/alasdairmorris/filesrvr@latest
 
 ## Usage
 
+```
+A super-simple file server.
+
+Usage:
+  filesrvr -r ROOTDIR -p PORT
+  filesrvr -h | --help
+  filesrvr --version
+
+Options:
+  -h, --help              Show this screen.
+  --version               Show version.
+  -r, --rootdir DIR       Root directory for CGI programs.
+  -p, --port PORT         Port to listen on.
+
+Homepage: https://github.com/alasdairmorris/filesrvr
+```
 
 ## Examples
+
+```
+filesrvr -r ~/public -p 8081
+```

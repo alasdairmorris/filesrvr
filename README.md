@@ -56,7 +56,7 @@ Usage:
 Options:
   -h, --help              Show this screen.
   --version               Show version.
-  -r, --rootdir DIR       Root directory for CGI programs.
+  -r, --rootdir DIR       Root directory for files.
   -p, --port PORT         Port to listen on.
 
 Homepage: https://github.com/alasdairmorris/filesrvr

@@ -1,20 +1,25 @@
 package main
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/docopt/docopt-go"
 )
 
-const version = "v0.1"
+const version = "v0.2"
 
 const usage = `A super-simple file server.
 
 Usage:
-  filesrvr -r ROOTDIR -p PORT
+  filesrvr -r ROOTDIR -p PORT [-a USER:PASS]
   filesrvr -h | --help
   filesrvr --version
 
@@ -23,16 +28,10 @@ Options:
   --version               Show version.
   -r, --rootdir DIR       Root directory for files.
   -p, --port PORT         Port to listen on.
+  -a, --auth USER:PASS    Enable basic auth protection, using user/pass combo.
 
 Homepage: https://github.com/alasdairmorris/filesrvr
 `
-
-type Config struct {
-	Rootdir string
-	Port    int
-}
-
-var config Config
 
 func exitOnError(e error) {
 	if e != nil {
@@ -40,15 +39,32 @@ func exitOnError(e error) {
 	}
 }
 
-// Parse and validate command-line arguments
-func getConfig() Config {
+type application struct {
+	config struct {
+		rootdir  string
+		port     int
+		username string
+		password string
+	}
+}
+
+func main() {
+
+	app := new(application)
+
+	app.init()
+	app.run()
+
+}
+
+func (app *application) init() {
 
 	var (
-		retval     Config
 		opts       docopt.Opts
 		rootdir    string
 		absRootDir string
 		port       string
+		auth       string
 		err        error
 	)
 
@@ -62,25 +78,61 @@ func getConfig() Config {
 	absRootDir, err = filepath.Abs(rootdir)
 	exitOnError(err)
 
-	retval.Rootdir = absRootDir
+	app.config.rootdir = absRootDir
 
 	// Port
 	port, err = opts.String("--port")
 	exitOnError(err)
 
-	retval.Port, err = strconv.Atoi(port)
+	app.config.port, err = strconv.Atoi(port)
 	exitOnError(err)
 
-	return retval
+	// Auth
+	auth, err = opts.String("--auth")
+
+	if len(auth) > 0 {
+		bits := strings.Split(auth, ":")
+		if len(bits) == 2 {
+			app.config.username = bits[0]
+			app.config.password = bits[1]
+		} else {
+			fmt.Fprintf(os.Stderr, "Error parsing auth details %q\n", auth)
+			os.Exit(1)
+		}
+	}
 }
 
-func main() {
+func (app *application) basicAuth() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if ok {
+			usernameHash := sha256.Sum256([]byte(username))
+			passwordHash := sha256.Sum256([]byte(password))
+			expectedUsernameHash := sha256.Sum256([]byte(app.config.username))
+			expectedPasswordHash := sha256.Sum256([]byte(app.config.password))
 
-	config = getConfig()
+			usernameMatch := (subtle.ConstantTimeCompare(usernameHash[:], expectedUsernameHash[:]) == 1)
+			passwordMatch := (subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1)
 
-	log.Printf("Starting server on port %d, with rootdir %s", config.Port, config.Rootdir)
+			if usernameMatch && passwordMatch {
+				http.FileServer(http.Dir(app.config.rootdir)).ServeHTTP(w, r)
+				return
+			}
+		}
 
-	http.Handle("/", http.FileServer(http.Dir(config.Rootdir)))
+		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	})
+}
 
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(config.Port), nil))
+func (app *application) run() {
+	log.Printf("Starting server on port %d, with rootdir %s", app.config.port, app.config.rootdir)
+
+	if app.config.username != "" && app.config.password != "" {
+		http.Handle("/", app.basicAuth())
+	} else {
+		http.Handle("/", http.FileServer(http.Dir(app.config.rootdir)))
+	}
+
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(app.config.port), nil))
 }

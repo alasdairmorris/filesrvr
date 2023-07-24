@@ -60,7 +60,7 @@ go install github.com/alasdairmorris/filesrvr@latest
 A super-simple file server.
 
 Usage:
-  filesrvr -r ROOTDIR -p PORT
+  filesrvr -r ROOTDIR -p PORT [-a USER:PASS]
   filesrvr -h | --help
   filesrvr --version
 
@@ -69,6 +69,7 @@ Options:
   --version               Show version.
   -r, --rootdir DIR       Root directory for files.
   -p, --port PORT         Port to listen on.
+  -a, --auth USER:PASS    Enable basic auth protection, using user/pass combo.
 
 Homepage: https://github.com/alasdairmorris/filesrvr
 ```

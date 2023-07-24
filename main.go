@@ -14,7 +14,7 @@ import (
 	"github.com/docopt/docopt-go"
 )
 
-const version = "v0.2"
+const version = "v0.3"
 
 const usage = `A super-simple file server.
 
